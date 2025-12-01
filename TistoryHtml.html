@@ -24,7 +24,8 @@
             signalGooglefcPresent();
         })();
     </script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.11.1/tocbot.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.11.1/tocbot.css">
     <meta charset="UTF-8">
     <meta name="viewport"
         content="user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, width=device-width">
@@ -185,6 +186,9 @@
                     </div>
                 </s_if_var_promotion-1-image>
                 <div class="content-wrap">
+                    <!-- TOC -->
+                    <div class='toc'></div>
+                    
                     <!-- 페이지 상단 광고(인 아티클) -->
                     <ins class="adsbygoogle" style="display:block; text-align:center;" data-ad-layout="in-article" data-ad-format="fluid"
                         data-ad-client="ca-pub-2223988613148758" data-ad-slot="6243646628"></ins>
@@ -193,7 +197,6 @@
                     </script>                    
                     <article id="content">
                         [##_revenue_list_upper_##]
-
                         <s_cover_group>
                             <s_cover_rep>
 
@@ -574,11 +577,11 @@
                                                                     maxlength="8" placeholder="비밀번호"
                                                                     value="[##_rp_admin_check_##]">
                                                             </s_rp_guest>
-                                                            <div class="secret">
+                                                            <!-- <div class="secret">
                                                                 <input type="checkbox" name="[##_rp_input_is_secret_##]"
                                                                     id="secret">
                                                                 <label for="secret" tabindex="0">비밀글</label>
-                                                            </div>
+                                                            </div> -->
                                                         </div>
                                                     </s_rp_member>
                                                     <textarea name="[##_rp_input_comment_##]" cols="" rows="4"
@@ -800,6 +803,47 @@
         </div>
     </s_t3>
     <script src="./images/script.js"></script>
+    <!-- TOC -->
+	<script>
+		var content = document.querySelector('.entry-content')
+		var headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6, h7')
+		var headingMap = {}
+
+		Array.prototype.forEach.call(headings, function (heading) {
+				var id = heading.id ? heading.id : heading.textContent.trim().toLowerCase()
+									 .split(' ').join('-').replace(/[\!\@\#\$\%\^\&\*\(\):]/ig, '')
+				headingMap[id] = !isNaN(headingMap[id]) ? ++headingMap[id] : 0
+				if (headingMap[id]) {
+					heading.id = id + '-' + headingMap[id]
+				} else {
+					heading.id = id
+				}
+			})
+
+		tocbot.init({
+                    tocSelector: '.toc',
+                    contentSelector: '.entry-content',
+                    headingSelector: 'h1, h2, h3',
+                    hasInnerContainers: false,
+                    ignoreSelector: '.another_category_color_gray h4',
+                    collapseDepth: 4
+		});
+
+		$(document).ready(function(){
+			$('.toc').addClass('toc-absolute');
+
+			var toc_top = $('.toc').offset().top - 165;
+			$(window).scroll(function() {
+				if ($(this).scrollTop() >= toc_top) {
+					$('.toc').addClass('toc-fixed');
+					$('.toc').removeClass('toc-absolute');
+				} else {
+					$('.toc').addClass('toc-absolute');
+					$('.toc').removeClass('toc-fixed');
+				}
+			});
+		});
+	</script>    
 </body>
 
 </html>
