@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" class="modern">
 
 <head>
     <!-- fontawesome 아이콘 -->
@@ -39,7 +39,45 @@
     <meta property="og:url" content="https://ksr930.tistory.com/">
     <!--<title>개발과 일상</title>-->
     <title>[##_page_title_##]</title>
-    <link rel="stylesheet" href="./style.css">
+    <link id="theme-style" rel="stylesheet" href="./style.css">
+    <style>
+        .theme-toggle {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            width: 44px;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1.5px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.12);
+            color: #f5f5f5;
+            border-radius: 50%;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(10px);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+            z-index: 120;
+        }
+        .theme-toggle i {
+            font-size: 1rem;
+        }
+        .theme-toggle:hover,
+        .theme-toggle:focus {
+            outline: none;
+            transform: translateY(-1px);
+            box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
+        }
+        [data-theme="white"] .theme-toggle {
+            border-color: rgba(0, 0, 0, 0.15);
+            background: rgba(255, 255, 255, 0.95);
+            color: #0f172a;
+        }
+        [data-theme="white"] .theme-toggle:hover,
+        [data-theme="white"] .theme-toggle:focus {
+            background: rgba(255, 255, 255, 1);
+        }
+    </style>
     <!-- <link href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.css" rel="stylesheet"> -->
     <script src="//t1.daumcdn.net/tistory_admin/lib/jquery/jquery-1.12.4.min.js"></script>
     <!-- 구글 애드센스 -->
@@ -83,6 +121,9 @@
                     <nav id="gnb">
                         [##_blog_menu_##]
                     </nav>
+                    <button type="button" class="theme-toggle" aria-pressed="false" aria-label="테마 전환" onclick="window.switchTheme && window.switchTheme();">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
                 </div>
             </header>
             <section id="container">
@@ -802,48 +843,78 @@
             </footer>
         </div>
     </s_t3>
-    <script src="./images/script.js"></script>
     <!-- TOC -->
 	<script>
-		var content = document.querySelector('.entry-content')
-		var headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6, h7')
-		var headingMap = {}
+        (function () {
+            var content = document.querySelector('.entry-content');
+            if (!content) {
+                return;
+            }
+            var headings = content.querySelectorAll('h1, h2, h3');
+            var headingMap = {};
 
-		Array.prototype.forEach.call(headings, function (heading) {
-				var id = heading.id ? heading.id : heading.textContent.trim().toLowerCase()
-									 .split(' ').join('-').replace(/[\!\@\#\$\%\^\&\*\(\):]/ig, '')
-				headingMap[id] = !isNaN(headingMap[id]) ? ++headingMap[id] : 0
-				if (headingMap[id]) {
-					heading.id = id + '-' + headingMap[id]
-				} else {
-					heading.id = id
-				}
-			})
+            Array.prototype.forEach.call(headings, function (heading) {
+                var id = heading.id ? heading.id : heading.textContent.trim().toLowerCase()
+                    .split(' ').join('-').replace(/[\!\@\#\$\%\^\&\*\(\):]/ig, '');
+                headingMap[id] = !isNaN(headingMap[id]) ? ++headingMap[id] : 0;
+                if (headingMap[id]) {
+                    heading.id = id + '-' + headingMap[id];
+                } else {
+                    heading.id = id;
+                }
+            });
 
-		tocbot.init({
-                    tocSelector: '.toc',
-                    contentSelector: '.entry-content',
-                    headingSelector: 'h1, h2, h3',
-                    hasInnerContainers: false,
-                    ignoreSelector: '.another_category_color_gray h4',
-                    collapseDepth: 4
-		});
+            tocbot.init({
+                tocSelector: '.toc',
+                contentSelector: '.entry-content',
+                headingSelector: 'h1, h2, h3',
+                hasInnerContainers: false,
+                ignoreSelector: '.another_category_color_gray h4',
+                collapseDepth: 4
+            });
 
-		$(document).ready(function(){
-			$('.toc').addClass('toc-absolute');
+            $(document).ready(function(){
+                $('.toc').addClass('toc-absolute');
 
-			var toc_top = $('.toc').offset().top - 165;
-			$(window).scroll(function() {
-				if ($(this).scrollTop() >= toc_top) {
-					$('.toc').addClass('toc-fixed');
-					$('.toc').removeClass('toc-absolute');
-				} else {
-					$('.toc').addClass('toc-absolute');
-					$('.toc').removeClass('toc-fixed');
-				}
-			});
-		});
+                var toc_top = $('.toc').offset().top - 165;
+                $(window).scroll(function() {
+                    if ($(this).scrollTop() >= toc_top) {
+                        $('.toc').addClass('toc-fixed');
+                        $('.toc').removeClass('toc-absolute');
+                    } else {
+                        $('.toc').addClass('toc-absolute');
+                        $('.toc').removeClass('toc-fixed');
+                    }
+                });
+            });
+        })();
 	</script>    
+    <script>
+        (function () {
+            var toggle = document.querySelector('.theme-toggle');
+            var key = 'tistory-theme';
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            function setTheme(theme) {
+                var isWhite = theme === 'white';
+                document.documentElement.dataset.theme = isWhite ? 'white' : 'black';
+                localStorage.setItem(key, isWhite ? 'white' : 'black');
+                if (toggle) {
+                    toggle.innerHTML = isWhite ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+                    toggle.setAttribute('aria-pressed', isWhite ? 'false' : 'true');
+                    toggle.setAttribute('aria-label', isWhite ? '다크 테마로 전환' : '라이트 테마로 전환');
+                }
+            }
+
+            window.switchTheme = function () {
+                var current = document.documentElement.dataset.theme || 'black';
+                setTheme(current === 'white' ? 'black' : 'white');
+            };
+
+            var saved = localStorage.getItem(key);
+            setTheme(saved || (prefersDark ? 'black' : 'white'));
+        })();
+    </script>
 </body>
 
 </html>
