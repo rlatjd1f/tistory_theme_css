@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-매일 구글 트렌드 기반 주제를 선택해 LLM으로 글을 생성하고 티스토리에 업로드하는 스크립트.
-- 실행: python auto_post.py --dry-run (사전 확인) / 크론 등으로 주기 실행
-- 필요 env: OPENAI_API_KEY, TISTORY_ACCESS_TOKEN, TISTORY_BLOG_NAME
-- 선택 env: TISTORY_CATEGORY_ID_GAME, TISTORY_CATEGORY_ID_FINANCE, OPENAI_MODEL
+매일 구글 트렌드 기반 주제를 선택해 LLM으로 SEO 지향 마크다운 글을 생성하는 스크립트.
+- 실행: python auto_post.py --dry-run (콘솔 확인) / 크론 등으로 주기 실행
+- 필요 env: OPENAI_API_KEY
+- 선택 env: OPENAI_MODEL
 """
 
 import argparse
@@ -11,12 +11,11 @@ import datetime as dt
 import logging
 import os
 import random
+import re
 import sys
 from typing import Dict, List, Optional, Tuple
 
-import requests
 from dotenv import load_dotenv
-from markdown import markdown
 from openai import OpenAI
 from pytrends.request import TrendReq
 
@@ -57,20 +56,9 @@ def load_settings():
     if not openai_key:
         sys.exit("OPENAI_API_KEY 가 설정되지 않았습니다.")
 
-    tistory_token = os.getenv("TISTORY_ACCESS_TOKEN")
-    blog_name = os.getenv("TISTORY_BLOG_NAME")
-    if not tistory_token or not blog_name:
-        sys.exit("TISTORY_ACCESS_TOKEN, TISTORY_BLOG_NAME 환경변수를 설정하세요.")
-
     return {
         "openai_key": openai_key,
         "openai_model": os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        "tistory_token": tistory_token,
-        "blog_name": blog_name,
-        "category_ids": {
-            "game": os.getenv("TISTORY_CATEGORY_ID_GAME"),
-            "finance": os.getenv("TISTORY_CATEGORY_ID_FINANCE"),
-        },
     }
 
 
@@ -106,20 +94,21 @@ def pick_topic(topics: List[str], preferred: Optional[str]) -> Tuple[str, str]:
 
 def build_prompt(topic: str, category: str, date: str) -> List[Dict[str, str]]:
     system_prompt = (
-        "당신은 티스토리 블로그 SEO 전문 작가입니다. "
-        "H2/H3 소제목과 불릿, 표, 핵심 요약을 포함한 한국어 마크다운 글을 만듭니다. "
-        "출처 링크는 신뢰도 높은 곳으로 최소 2개 제안하세요."
+        "당신은 검색 노출을 극대화하는 한국어 SEO 전문 작가입니다. "
+        "주요 키워드를 제목과 H2/H3에 자연스럽게 배치하고, 스니펫·FAQ·목록을 활용한 "
+        "마크다운 글을 작성합니다. 출처 링크는 신뢰도 높은 곳으로 최소 2개 제안하세요."
     )
     user_prompt = f"""
 주제: {topic}
-카테고리: {category} (게임: 공략/신작/업데이트, finance: 국내외 주식/경제)
+카테고리: {category} (game: 공략/신작/업데이트, finance: 국내외 주식/경제)
 작성일: {date}
 포함 사항:
-- 120~180자 리드 요약
-- H2/H3 구조의 본문 (배경→핵심 포인트→체크리스트/전략→FAQ 2문항)
-- 3~5개 키워드 태그 제안
-- 마지막에 오늘 날짜를 포함한 짧은 마무리 문장
-- 억측/루머 금지, 수치는 보수적으로 표현
+- SEO 최적화된 H1 제목 1개(주요 키워드 포함)
+- 120~180자 리드 요약에 핵심 키워드 1회 포함
+- H2/H3 구조 본문: 배경→핵심 포인트→체크리스트/전략→FAQ 2문항(FAQ는 검색 의도형 질문)
+- 3~5개 키워드 태그 제안(검색 노출용)
+- 오늘 날짜를 포함한 짧은 마무리 문장
+- 억측/루머 금지, 수치는 보수적으로 표현, 과장 금지
 """
     return [
         {"role": "system", "content": system_prompt},
@@ -132,42 +121,18 @@ def generate_markdown(client: OpenAI, prompt: List[Dict[str, str]], model: str) 
     return resp.choices[0].message.content
 
 
-def markdown_to_html(md_text: str) -> str:
-    return markdown(md_text, extensions=["extra", "sane_lists", "toc"])
-
-
-def post_to_tistory(title: str, html_content: str, tags: List[str], settings, category: str, visibility: int):
-    token = settings["tistory_token"]
-    blog = settings["blog_name"]
-    category_id = settings["category_ids"].get(category)
-
-    payload = {
-        "access_token": token,
-        "output": "json",
-        "blogName": blog,
-        "title": title,
-        "content": html_content,
-        "tag": ",".join(tags),
-        "visibility": visibility,
-    }
-    if category_id:
-        payload["category"] = category_id
-
-    resp = requests.post("https://www.tistory.com/apis/post/write", data=payload, timeout=30)
-    if resp.status_code != 200:
-        raise RuntimeError(f"티스토리 응답 오류: {resp.status_code} {resp.text}")
-    data = resp.json()
-    if data.get("tistory", {}).get("status") != "200":
-        raise RuntimeError(f"티스토리 API 실패: {data}")
-    return data["tistory"]["postId"]
+def slugify(value: str) -> str:
+    cleaned = re.sub(r"[^\w\s-]", "", value, flags=re.UNICODE)
+    cleaned = re.sub(r"[-\s]+", "-", cleaned).strip("-").lower()
+    return cleaned or "post"
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="구글 트렌드 기반 티스토리 자동 포스팅")
+    parser = argparse.ArgumentParser(description="구글 트렌드 기반 SEO 마크다운 생성")
     parser.add_argument("--preferred-category", choices=list(CATEGORY_KEYWORDS.keys()), help="우선 카테고리 고정")
     parser.add_argument("--dry-run", action="store_true", help="실제 업로드 없이 생성 결과만 출력")
-    parser.add_argument("--visibility", type=int, default=3, help="공개 범위 (0 비공개, 1 보호, 2 이웃, 3 공개)")
     parser.add_argument("--limit", type=int, default=20, help="트렌드 상위 몇 개까지 볼지")
+    parser.add_argument("--output-dir", default="posts", help="생성된 마크다운 저장 경로")
     return parser.parse_args()
 
 
@@ -184,24 +149,30 @@ def main():
 
     topic, category = pick_topic(trends, args.preferred_category)
     today = dt.datetime.now().strftime("%Y-%m-%d")
-    title = f"{today} {topic} - {category.capitalize()} 트렌드 브리핑"
+    title = f"{topic} {category} 트렌드 브리핑 ({today})"
     prompt = build_prompt(topic, category, today)
 
     logger.info("선택된 주제: %s / 카테고리: %s", topic, category)
     md_text = generate_markdown(client, prompt, settings["openai_model"])
-    html_body = markdown_to_html(md_text)
     tags = CATEGORY_TAGS.get(category, [])
 
     if args.dry_run:
-        logger.info("[DRY RUN] 업로드 생략, 결과를 출력합니다.")
+        logger.info("[DRY RUN] 파일 저장 없이 결과를 출력합니다.")
         print("==== TITLE ====")
         print(title)
         print("\n==== MARKDOWN ====")
         print(md_text)
         return
 
-    post_id = post_to_tistory(title, html_body, tags, settings, category, args.visibility)
-    logger.info("포스팅 완료: postId=%s", post_id)
+    os.makedirs(args.output_dir, exist_ok=True)
+    filename = f"{today}-{slugify(topic)}.md"
+    path = os.path.join(args.output_dir, filename)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"# {title}\n\n")
+        f.write(md_text)
+
+    logger.info("마크다운 저장 완료: %s", path)
+    logger.info("참조 태그: %s", ", ".join(tags))
 
 
 if __name__ == "__main__":
