@@ -448,17 +448,51 @@ html[data-theme="black"] #gnb ul li.current a {
 .entry-content h5,
 .entry-content h6 {
     color: var(--text);
-    margin: 28px 0 16px;
-    font-weight: 700;
+    margin: 30px 0 16px;
+    font-weight: 750;
     line-height: 1.35;
 }
 
-.entry-content h1 { font-size: 1.8rem; }
-.entry-content h2 { font-size: 1.6rem; }
-.entry-content h3 { font-size: 1.3rem; }
-.entry-content h4 { font-size: 1.1rem; }
-.entry-content h5 { font-size: 1rem; }
-.entry-content h6 { font-size: 0.95rem; }
+.entry-content h1 {
+    font-size: 2rem;
+    padding-bottom: 10px;
+    border-bottom: 3px solid var(--accent);
+}
+
+.entry-content h2 {
+    font-size: 1.7rem;
+    padding: 8px 12px;
+    border-left: 6px solid var(--accent);
+    background: rgba(14, 165, 233, 0.08);
+    border-radius: 12px;
+}
+
+.entry-content h3 {
+    font-size: 1.35rem;
+    padding: 6px 10px;
+    border-bottom: 2px solid var(--border);
+    letter-spacing: -0.01em;
+}
+
+.entry-content h4 {
+    font-size: 1.1rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.entry-content h5 {
+    font-size: 1rem;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.entry-content h6 {
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 650;
+}
 
 .entry-content p {
     margin: 0 0 18px;
@@ -519,6 +553,8 @@ pre code {
     border-collapse: collapse;
     margin: 18px 0;
     font-size: 0.95rem;
+    border-radius: 14px;
+    overflow: hidden;
 }
 
 .entry-content th,
@@ -531,6 +567,21 @@ pre code {
 .entry-content thead {
     background: rgba(14, 165, 233, 0.08);
     color: var(--text);
+    border-bottom: 2px solid var(--accent);
+}
+
+.entry-content thead th {
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.entry-content tbody tr:nth-child(even) {
+    background: rgba(14, 165, 233, 0.04);
+}
+
+.entry-content tbody tr:hover {
+    background: rgba(14, 165, 233, 0.08);
 }
 
 /* Tags & pagination */
