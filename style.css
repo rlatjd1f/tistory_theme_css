@@ -158,7 +158,7 @@ html[data-theme="black"] #gnb ul li.current a {
 
 /* Layout */
 #container .content-wrap {
-    max-width: 1180px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 24px 72px;
     display: flex;
@@ -166,13 +166,13 @@ html[data-theme="black"] #gnb ul li.current a {
 }
 
 #content {
-    flex: 1 1 720px;
+    flex: 1 1 940px;
     min-width: 0;
-    max-width: 780px;
+    max-width: 1000px;
 }
 
 #tt-body-page #container .content-wrap {
-    max-width: 1280px;
+    max-width: 1600px;
     padding-left: 12px;
     padding-right: 12px;
     display: flex;
@@ -180,7 +180,8 @@ html[data-theme="black"] #gnb ul li.current a {
 }
 
 #tt-body-page #content {
-    max-width: 1140px;
+    max-width: 1000px;
+    flex: 1 1 1040px;
 }
 
 #aside.sidebar {

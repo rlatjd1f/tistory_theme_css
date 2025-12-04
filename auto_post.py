@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-매일 구글 트렌드 기반 주제를 선택해 LLM으로 SEO 지향 마크다운 글을 생성하는 스크립트.
-- 실행: python auto_post.py --dry-run (콘솔 확인) / 크론 등으로 주기 실행
+입력한 주제로 LLM이 SEO 지향 마크다운 글을 생성하는 스크립트.
+- 실행: python auto_post.py --topic "주제" [--category game|finance|general] --dry-run
 - 필요 env: OPENAI_API_KEY
 - 선택 env: OPENAI_MODEL
 """
@@ -10,14 +10,12 @@ import argparse
 import datetime as dt
 import logging
 import os
-import random
 import re
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 from dotenv import load_dotenv
 from openai import OpenAI
-from pytrends.request import TrendReq
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,27 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CATEGORY_KEYWORDS: Dict[str, List[str]] = {
-    "game": ["게임", "공략", "패치", "신작", "랭킹", "배틀", "mmorpg", "fps", "콘솔", "모바일"],
-    "finance": [
-        "주식",
-        "증시",
-        "나스닥",
-        "코스피",
-        "금리",
-        "환율",
-        "공시",
-        "실적",
-        "ipo",
-        "경제",
-        "원자재",
-        "채권",
-    ],
-}
-
 CATEGORY_TAGS: Dict[str, List[str]] = {
     "game": ["게임", "공략", "트렌드"],
     "finance": ["주식", "경제", "마켓"],
+    "general": [],
 }
 
 
@@ -62,53 +43,28 @@ def load_settings():
     }
 
 
-def fetch_trending(limit: int = 20) -> List[str]:
-    pt = TrendReq(hl="ko-KR", tz=540)
-    df = pt.trending_searches(pn="south_korea")
-    topics = [t for t in df[0].tolist() if isinstance(t, str)]
-    logger.info("트렌딩 키워드 %d개 수집", len(topics))
-    return topics[:limit]
-
-
-def pick_topic(topics: List[str], preferred: Optional[str]) -> Tuple[str, str]:
-    if preferred and preferred in CATEGORY_KEYWORDS:
-        category = preferred
-        topic = topics[0] if topics else "오늘의 핫이슈"
-        return topic, category
-
-    scored: List[Tuple[int, str, str]] = []
-    for t in topics:
-        for category, needles in CATEGORY_KEYWORDS.items():
-            score = sum(1 for n in needles if n.lower() in t.lower())
-            if score:
-                scored.append((score, t, category))
-    if scored:
-        scored.sort(key=lambda x: (-x[0], x[1]))
-        _, topic, category = scored[0]
-        return topic, category
-
-    fallback_category = preferred or random.choice(list(CATEGORY_KEYWORDS.keys()))
-    fallback_topic = topics[0] if topics else "오늘의 핫이슈"
-    return fallback_topic, fallback_category
-
-
 def build_prompt(topic: str, category: str, date: str) -> List[Dict[str, str]]:
     system_prompt = (
         "당신은 검색 노출을 극대화하는 한국어 SEO 전문 작가입니다. "
-        "주요 키워드를 제목과 H2/H3에 자연스럽게 배치하고, 스니펫·FAQ·목록을 활용한 "
-        "마크다운 글을 작성합니다. 출처 링크는 신뢰도 높은 곳으로 최소 2개 제안하세요."
+        "주요·변형 키워드를 제목과 H2/H3에 자연스럽게 배치하고, 스니펫·FAQ·목록을 활용한 "
+        "마크다운 글을 작성합니다. 과장·확정적 표현·투자/의료/법률 조언을 금지하고, 수치는 범위/추정으로 "
+        "보수적으로 적습니다. 최근 기사·블로그·커뮤니티·보고서에서 드러난 핵심 사실을 최대한 반영하고 5~7개로 "
+        "묶어 전달하세요. 모든 주장에는 근거를 달며, 출처 링크는 신뢰도 높은 곳으로 최소 2개 제안하세요. "
+        "본문 분량은 약 3,000자(±10%)로 맞추고, 제목/단락 구성은 SEO에 적합한 H1/H2/H3 체계를 따릅니다."
     )
     user_prompt = f"""
 주제: {topic}
-카테고리: {category} (game: 공략/신작/업데이트, finance: 국내외 주식/경제)
+카테고리: {category}
 작성일: {date}
 포함 사항:
 - SEO 최적화된 H1 제목 1개(주요 키워드 포함)
 - 120~180자 리드 요약에 핵심 키워드 1회 포함
-- H2/H3 구조 본문: 배경→핵심 포인트→체크리스트/전략→FAQ 2문항(FAQ는 검색 의도형 질문)
-- 3~5개 키워드 태그 제안(검색 노출용)
+- H2/H3 구조 본문: 배경→핵심 포인트(최근 보도된 사실·인물·수치·일정)→체크리스트/전략→FAQ 2문항(FAQ는 검색 의도형 질문, 각 2~3문장), 전체 분량 약 3,000자(±10%)
+- H2/H3마다 주요/변형 키워드를 자연스럽게 1회 포함, 제목/소제목도 검색 의도를 반영해 작성
+- 출처 링크 2곳 이상(한국/영문 신뢰도 높은 매체) 제안
+- 3~5개 키워드 태그 제안(검색 노출용, '태그: ...' 한 줄로 표기)
 - 오늘 날짜를 포함한 짧은 마무리 문장
-- 억측/루머 금지, 수치는 보수적으로 표현, 과장 금지
+- 억측/루머 금지, 과장 금지, 투자·의료·법률 조언 금지, 수치는 범위/추정으로 보수적 표현
 """
     return [
         {"role": "system", "content": system_prompt},
@@ -128,10 +84,10 @@ def slugify(value: str) -> str:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="구글 트렌드 기반 SEO 마크다운 생성")
-    parser.add_argument("--preferred-category", choices=list(CATEGORY_KEYWORDS.keys()), help="우선 카테고리 고정")
+    parser = argparse.ArgumentParser(description="입력 주제로 SEO 마크다운 생성")
+    parser.add_argument("--topic", required=True, help="작성할 주제 텍스트")
+    parser.add_argument("--category", choices=list(CATEGORY_TAGS.keys()), default="general", help="카테고리 (기본: general)")
     parser.add_argument("--dry-run", action="store_true", help="실제 업로드 없이 생성 결과만 출력")
-    parser.add_argument("--limit", type=int, default=20, help="트렌드 상위 몇 개까지 볼지")
     parser.add_argument("--output-dir", default="posts", help="생성된 마크다운 저장 경로")
     return parser.parse_args()
 
@@ -141,18 +97,13 @@ def main():
     settings = load_settings()
     client = OpenAI(api_key=settings["openai_key"])
 
-    try:
-        trends = fetch_trending(limit=args.limit)
-    except Exception as exc:
-        logger.warning("구글 트렌드 수집 실패: %s", exc)
-        trends = []
-
-    topic, category = pick_topic(trends, args.preferred_category)
+    topic = args.topic
+    category = args.category
     today = dt.datetime.now().strftime("%Y-%m-%d")
-    title = f"{topic} {category} 트렌드 브리핑 ({today})"
+    title = f"{topic} {category} 브리핑 ({today})"
     prompt = build_prompt(topic, category, today)
 
-    logger.info("선택된 주제: %s / 카테고리: %s", topic, category)
+    logger.info("입력 주제: %s / 카테고리: %s", topic, category)
     md_text = generate_markdown(client, prompt, settings["openai_model"])
     tags = CATEGORY_TAGS.get(category, [])
 

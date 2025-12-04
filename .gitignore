@@ -1,1 +1,4 @@
 WriteTemplate.html
+.env
+__pycache__/
+posts/
